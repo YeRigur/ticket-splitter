@@ -315,7 +315,7 @@ function buildSheetRows(header, records, includeProject) {
 
   for (const record of records) {
     const values = record.values.slice();
-    values[2] = record.duration;
+    values[2] = formatDurationForExport(record.duration, record.values[2]);
     const row = includeProject ? [record.project, ...values] : values;
     rows.push(row);
   }
@@ -338,6 +338,20 @@ function sanitizeSheetName(name) {
   const cleaned = (name || 'Sheet1').replace(/[\[\]\*\/\\\?:]/g, ' ').trim();
   const fallback = cleaned || 'Sheet1';
   return fallback.slice(0, 31);
+}
+
+function formatDurationForExport(duration, originalValue) {
+  if (Number.isFinite(duration)) {
+    if (typeof originalValue === 'string') {
+      const match = originalValue.replace(/\s+/g, '').match(/[,\.](\d+)/);
+      if (match && match[1]) {
+        return duration.toFixed(match[1].length);
+      }
+    }
+    return duration.toString();
+  }
+  const cleaned = cleanCell(originalValue);
+  return cleaned ? cleaned.replace(',', '.') : '0';
 }
 
 function formatHours(value) {
