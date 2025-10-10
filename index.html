@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B2C Ticket Splitter</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <h1>B2C Ticket Splitter</h1>
+      <p class="lead">
+        Upload a CSV where the columns are ordered: user, comment, duration, date.
+        Processing happens entirely in the browser; nothing is uploaded to a server.
+      </p>
+    </header>
+
+    <section class="card">
+      <form id="upload-form">
+        <label class="file-label" for="csv-input">
+          <span>Select CSV File</span>
+          <input id="csv-input" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="has-header" checked>
+          <span>First row contains headers</span>
+        </label>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+
+    <section id="results" class="card hidden">
+      <div class="actions">
+        <button id="download-zip" type="button" class="primary">Download All Projects (.zip)</button>
+        <button id="download-combined" type="button">Download Combined CSV</button>
+      </div>
+
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Rows</th>
+            <th>Total Hours</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+      <p id="overall-hours" class="overall-hours"></p>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
