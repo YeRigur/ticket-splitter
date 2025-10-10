@@ -133,8 +133,13 @@ function updateSummary() {
   summaryBody.append(...rows);
 
   const hasAnyData = state.total > 0;
-  zipButton.disabled = !hasAnyData || typeof JSZip === 'undefined';
-  combinedButton.disabled = !realProjects.some((project) => (state.grouped.get(project) ?? []).length > 0);
+  zipButton.disabled =
+    !hasAnyData ||
+    typeof JSZip === 'undefined' ||
+    typeof XLSX === 'undefined';
+  combinedButton.disabled =
+    typeof XLSX === 'undefined' ||
+    !realProjects.some((project) => (state.grouped.get(project) ?? []).length > 0);
   overallHoursEl.textContent = hasAnyData
     ? `Overall hours: ${formatHours(hoursAccumulator)}`
     : '';
@@ -158,7 +163,7 @@ function createSummaryRow(project, count, hours) {
   const actionsCell = document.createElement('td');
   const button = document.createElement('button');
   button.type = 'button';
-  button.textContent = 'CSV';
+  button.textContent = 'XLSX';
   button.dataset.project = project;
   actionsCell.appendChild(button);
   row.appendChild(actionsCell);
@@ -170,18 +175,30 @@ function downloadProject(project) {
   if (!state) {
     return;
   }
+  if (typeof XLSX === 'undefined') {
+    setStatus('XLSX library failed to load. Check the CDN script tag.', true);
+    return;
+  }
   const entries = state.grouped.get(project);
   if (!entries?.length) {
     setStatus(`No rows found for project "${project}".`, true);
     return;
   }
-  const csv = createCsv(state.header, entries);
-  triggerDownload(csv, `${toSafeFilename(project) || 'project'}.csv`);
-  setStatus(`CSV for project "${project}" ready for download.`);
+  const workbook = createWorkbookFromRecords(state.header, entries, {
+    includeProject: false,
+    sheetName: project
+  });
+  const blob = workbookToBlob(workbook);
+  triggerDownload(blob, `${toSafeFilename(project) || 'project'}.xlsx`);
+  setStatus(`Workbook for project "${project}" ready for download.`);
 }
 
 function downloadCombinedFile() {
   if (!state) {
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    setStatus('XLSX library failed to load. Check the CDN script tag.', true);
     return;
   }
   const combined = [];
@@ -195,9 +212,13 @@ function downloadCombinedFile() {
     setStatus('No rows available for the combined report.', true);
     return;
   }
-  const csv = createCsv(state.header, combined, { includeProject: true });
-  triggerDownload(csv, 'all_b2c_projects.csv');
-  setStatus('Combined CSV ready for download.');
+  const workbook = createWorkbookFromRecords(state.header, combined, {
+    includeProject: true,
+    sheetName: 'Projects'
+  });
+  const blob = workbookToBlob(workbook);
+  triggerDownload(blob, 'all_projects.xlsx');
+  setStatus('Combined workbook ready for download.');
 }
 
 function downloadZipArchive() {
@@ -208,6 +229,10 @@ function downloadZipArchive() {
     setStatus('JSZip failed to load. Check the CDN script tag.', true);
     return;
   }
+  if (typeof XLSX === 'undefined') {
+    setStatus('XLSX library failed to load. Check the CDN script tag.', true);
+    return;
+  }
 
   const zip = new JSZip();
   let filesAdded = 0;
@@ -216,8 +241,12 @@ function downloadZipArchive() {
     if (!entries.length) {
       continue;
     }
-    const csv = createCsv(state.header, entries);
-    zip.file(`${toSafeFilename(project) || 'project'}.csv`, csv);
+    const workbook = createWorkbookFromRecords(state.header, entries, {
+      includeProject: false,
+      sheetName: project
+    });
+    const buffer = workbookToArrayBuffer(workbook);
+    zip.file(`${toSafeFilename(project) || 'project'}.xlsx`, buffer, { binary: true });
     filesAdded += 1;
   }
 
@@ -234,20 +263,8 @@ function downloadZipArchive() {
     .catch((error) => setStatus(`Failed to build ZIP archive: ${error.message}`, true));
 }
 
-function createCsv(header, records, { includeProject = false } = {}) {
-  const effectiveHeader = includeProject ? ['Project', ...header] : header;
-  const lines = [effectiveHeader.map(escapeCsv).join(',')];
-
-  for (const record of records) {
-    const row = includeProject ? [record.project, ...record.values] : record.values;
-    lines.push(row.map(escapeCsv).join(','));
-  }
-
-  return lines.join('\n');
-}
-
 function triggerDownload(data, filename) {
-  const blob = data instanceof Blob ? data : new Blob([data], { type: 'text/csv;charset=utf-8;' });
+  const blob = data instanceof Blob ? data : new Blob([data]);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -281,6 +298,46 @@ function parseDuration(value) {
   const normalized = cleanCell(value).replace(/\s+/g, '').replace(',', '.');
   const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function createWorkbookFromRecords(header, records, { includeProject, sheetName }) {
+  const rows = buildSheetRows(header, records, includeProject);
+  const workbook = XLSX.utils.book_new();
+  const safeSheet = sanitizeSheetName(sheetName);
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheet);
+  return workbook;
+}
+
+function buildSheetRows(header, records, includeProject) {
+  const effectiveHeader = includeProject ? ['Project', ...header] : [...header];
+  const rows = [effectiveHeader];
+
+  for (const record of records) {
+    const values = record.values.slice();
+    values[2] = record.duration;
+    const row = includeProject ? [record.project, ...values] : values;
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function workbookToBlob(workbook) {
+  const buffer = workbookToArrayBuffer(workbook);
+  return new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+}
+
+function workbookToArrayBuffer(workbook) {
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+}
+
+function sanitizeSheetName(name) {
+  const cleaned = (name || 'Sheet1').replace(/[\[\]\*\/\\\?:]/g, ' ').trim();
+  const fallback = cleaned || 'Sheet1';
+  return fallback.slice(0, 31);
 }
 
 function formatHours(value) {
