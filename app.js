@@ -3,7 +3,7 @@ import { filterDefinitions, compileFilters, realProjects } from './filters.js';
 const compiledFilters = compileFilters(filterDefinitions);
 const projectOrder = [...filterDefinitions.map((entry) => entry.name), 'Other'];
 
-const fileInput = document.getElementById('csv-input');
+const fileInput = document.getElementById('report-input');
 const hasHeaderCheckbox = document.getElementById('has-header');
 const statusEl = document.getElementById('status');
 const resultsSection = document.getElementById('results');
@@ -30,17 +30,79 @@ function handleFileSelection(event) {
     return;
   }
 
-  if (!file.name.toLowerCase().endsWith('.csv')) {
-    setStatus('Please select a CSV file.', true);
+  if (!isSupportedInputFile(file)) {
+    setStatus('Please select a CSV or XLSX file.', true);
     return;
   }
 
   setStatus('Reading file...');
+  if (isXlsxFile(file)) {
+    readXlsxFile(file);
+    return;
+  }
+
+  readCsvFile(file);
+}
+
+function isSupportedInputFile(file) {
+  return isCsvFile(file) || isXlsxFile(file);
+}
+
+function isCsvFile(file) {
+  const name = file.name.toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return name.endsWith('.csv') || type.includes('csv');
+}
+
+function isXlsxFile(file) {
+  const name = file.name.toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return (
+    name.endsWith('.xlsx') ||
+    type === 'application/xlsx' ||
+    type === 'application/vnd.ms-excel' ||
+    type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    type.includes('spreadsheetml')
+  );
+}
+
+function readCsvFile(file) {
   Papa.parse(file, {
     skipEmptyLines: 'greedy',
     complete: (result) => processData(result.data),
     error: (error) => setStatus(`Failed to read file: ${error.message}`, true)
   });
+}
+
+function readXlsxFile(file) {
+  if (typeof XLSX === 'undefined') {
+    setStatus('XLSX library failed to load. Check the CDN script tag.', true);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const workbook = XLSX.read(reader.result, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error('The XLSX file has no sheets.');
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        defval: '',
+        raw: false,
+        blankrows: false
+      });
+      processData(rows);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown XLSX parsing error.';
+      setStatus(`Failed to read file: ${message}`, true);
+    }
+  };
+  reader.onerror = () => setStatus('Failed to read file.', true);
+  reader.readAsArrayBuffer(file);
 }
 
 function processData(rows) {
