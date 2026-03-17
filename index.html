@@ -11,20 +11,20 @@
     <header class="page-header">
       <h1>B2C Ticket Splitter</h1>
       <p class="lead">
-        Upload a CSV or XLSX where the columns are ordered: user, comment,
-        duration, date. Processing happens entirely in the browser; nothing is
-        uploaded to a server.
+        Upload a CSV or Excel file where the columns are ordered: user,
+        comment, duration, date. Processing happens entirely in the browser;
+        nothing is uploaded to a server.
       </p>
     </header>
 
     <section class="card">
       <form id="upload-form">
         <label class="file-label" for="report-input">
-          <span>Select CSV or XLSX File</span>
+          <span>Select CSV or Excel File</span>
           <input
             id="report-input"
             type="file"
-            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept=".csv,.xls,.xlsx,.xlsm,.xlsb,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           >
         </label>
         <label class="checkbox">

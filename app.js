@@ -31,13 +31,13 @@ function handleFileSelection(event) {
   }
 
   if (!isSupportedInputFile(file)) {
-    setStatus('Please select a CSV or XLSX file.', true);
+    setStatus('Please select a CSV or Excel file.', true);
     return;
   }
 
   setStatus('Reading file...');
-  if (isXlsxFile(file)) {
-    readXlsxFile(file);
+  if (isSpreadsheetFile(file)) {
+    readSpreadsheetFile(file);
     return;
   }
 
@@ -45,7 +45,7 @@ function handleFileSelection(event) {
 }
 
 function isSupportedInputFile(file) {
-  return isCsvFile(file) || isXlsxFile(file);
+  return isCsvFile(file) || isSpreadsheetFile(file);
 }
 
 function isCsvFile(file) {
@@ -54,13 +54,18 @@ function isCsvFile(file) {
   return name.endsWith('.csv') || type.includes('csv');
 }
 
-function isXlsxFile(file) {
+function isSpreadsheetFile(file) {
   const name = file.name.toLowerCase();
   const type = (file.type || '').toLowerCase();
   return (
+    name.endsWith('.xls') ||
     name.endsWith('.xlsx') ||
+    name.endsWith('.xlsm') ||
+    name.endsWith('.xlsb') ||
     type === 'application/xlsx' ||
     type === 'application/vnd.ms-excel' ||
+    type === 'application/vnd.ms-excel.sheet.binary.macroenabled.12' ||
+    type === 'application/vnd.ms-excel.sheet.macroenabled.12' ||
     type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
     type.includes('spreadsheetml')
   );
@@ -74,7 +79,7 @@ function readCsvFile(file) {
   });
 }
 
-function readXlsxFile(file) {
+function readSpreadsheetFile(file) {
   if (typeof XLSX === 'undefined') {
     setStatus('XLSX library failed to load. Check the CDN script tag.', true);
     return;
@@ -83,10 +88,10 @@ function readXlsxFile(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const workbook = XLSX.read(reader.result, { type: 'array' });
+      const workbook = parseWorkbook(reader.result);
       const firstSheetName = workbook.SheetNames[0];
       if (!firstSheetName) {
-        throw new Error('The XLSX file has no sheets.');
+        throw new Error('The Excel file has no sheets.');
       }
       const worksheet = workbook.Sheets[firstSheetName];
       const rows = XLSX.utils.sheet_to_json(worksheet, {
@@ -97,12 +102,49 @@ function readXlsxFile(file) {
       });
       processData(rows);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown XLSX parsing error.';
+      const message = formatSpreadsheetError(error);
       setStatus(`Failed to read file: ${message}`, true);
     }
   };
   reader.onerror = () => setStatus('Failed to read file.', true);
   reader.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(arrayBuffer) {
+  const parseAttempts = [
+    () => XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' }),
+    () => XLSX.read(arrayBufferToBinaryString(arrayBuffer), { type: 'binary' })
+  ];
+
+  let lastError = null;
+  for (const attempt of parseAttempts) {
+    try {
+      return attempt();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Unknown spreadsheet parsing error.');
+}
+
+function arrayBufferToBinaryString(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunkSize = 0x8000;
+  const chunks = [];
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const slice = bytes.subarray(index, index + chunkSize);
+    chunks.push(String.fromCharCode(...slice));
+  }
+  return chunks.join('');
+}
+
+function formatSpreadsheetError(error) {
+  const message = error instanceof Error ? error.message : 'Unknown spreadsheet parsing error.';
+  if (/encrypted|encryptioninfo|password/i.test(message)) {
+    return 'This Excel file appears to be protected or saved in an unsupported format. Please open it in Excel or Google Sheets and save it again as a regular .xlsx or .csv file.';
+  }
+  return message;
 }
 
 function processData(rows) {
