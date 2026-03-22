@@ -35,6 +35,7 @@ const resultsSection = document.getElementById('results');
 const summaryBody = document.getElementById('summary-body');
 const zipButton = document.getElementById('download-zip');
 const combinedButton = document.getElementById('download-combined');
+const applyFiltersButton = document.getElementById('apply-filters');
 const overallHoursEl = document.getElementById('overall-hours');
 const configKindButtons = Array.from(document.querySelectorAll('[data-config-kind]'));
 const configProjectFilterWrap = document.getElementById('config-project-filter-wrap');
@@ -74,9 +75,13 @@ let configUiState = {
 
 setupNavigation(getInitialView());
 setupConfigPanel();
+if (applyFiltersButton) {
+  applyFiltersButton.disabled = true;
+}
 fileInput.addEventListener('change', handleFileSelection);
 zipButton.addEventListener('click', downloadZipArchive);
 combinedButton.addEventListener('click', downloadCombinedFile);
+applyFiltersButton?.addEventListener('click', applyCurrentFilters);
 configKindButtons.forEach((button) => {
   button.addEventListener('click', () => setConfigKind(button.dataset.configKind || 'project'));
 });
@@ -282,7 +287,19 @@ function refreshDerivedState(header, dataRows) {
   resultsSection.classList.remove('hidden');
   setStatus(`Processed rows: ${dataRows.length}`);
   updatePatternConfigAvailability();
+  if (applyFiltersButton) {
+    applyFiltersButton.disabled = !dataRows.length;
+  }
   updateSummary();
+}
+
+function applyCurrentFilters() {
+  if (!state?.rawRows?.length) {
+    setStatus('Upload a file first, then apply filters.');
+    return;
+  }
+  refreshDerivedState(state.header, state.rawRows);
+  setStatus(`Filters applied. Processed rows: ${state.rawRows.length}`);
 }
 
 function buildRecords(dataRows) {
@@ -1660,9 +1677,9 @@ function createWorkbookFromRecords(header, records, { includeProject, includeSub
 
 function buildSheetRows(header, records, includeProject, includeSubProject) {
   const effectiveHeader = [
+    ...header,
     ...(includeProject ? ['Project'] : []),
-    ...(includeSubProject ? ['Sub Project'] : []),
-    ...header
+    ...(includeSubProject ? ['Sub Project'] : [])
   ];
   const rows = [effectiveHeader];
 
@@ -1670,9 +1687,9 @@ function buildSheetRows(header, records, includeProject, includeSubProject) {
     const values = record.values.slice();
     values[2] = formatDurationForExport(record.duration, record.values[2]);
     const row = [
+      ...values,
       ...(includeProject ? [record.project] : []),
-      ...(includeSubProject ? [record.subProject || ''] : []),
-      ...values
+      ...(includeSubProject ? [record.subProject || ''] : [])
     ];
     rows.push(row);
   }
