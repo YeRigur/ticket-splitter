@@ -15,44 +15,149 @@
         comment, duration, date. Processing happens entirely in the browser;
         nothing is uploaded to a server.
       </p>
+      <nav class="tabs" aria-label="Pages">
+        <button type="button" class="tab active" data-view="splitter">Splitter</button>
+        <button type="button" class="tab" data-view="config">Pattern Config</button>
+        <button type="button" class="tab" id="import-config-trigger">Import Config</button>
+      </nav>
     </header>
 
-    <section class="card">
-      <form id="upload-form">
-        <label class="file-label" for="report-input">
-          <span>Select CSV or Excel File</span>
-          <input
-            id="report-input"
-            type="file"
-            accept=".csv,.xls,.xlsx,.xlsm,.xlsb,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          >
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" id="has-header" checked>
-          <span>First row contains headers</span>
-        </label>
-      </form>
-      <p id="status" role="status"></p>
+    <section id="splitter-view">
+      <section class="card">
+        <form id="upload-form">
+          <label class="file-label" for="report-input">
+            <span>Select CSV or Excel File</span>
+            <input
+              id="report-input"
+              type="file"
+              accept=".csv,.xls,.xlsx,.xlsm,.xlsb,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            >
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="has-header" checked>
+            <span>First row contains headers</span>
+          </label>
+        </form>
+        <p id="status" role="status"></p>
+      </section>
+
+      <section id="results" class="card hidden">
+        <div class="actions">
+          <button id="download-zip" type="button" class="primary">Download All Projects (.zip)</button>
+          <button id="download-combined" type="button">Download Combined XLSX</button>
+        </div>
+
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Rows</th>
+              <th>Total Hours</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="summary-body"></tbody>
+        </table>
+        <p id="overall-hours" class="overall-hours"></p>
+      </section>
     </section>
 
-    <section id="results" class="card hidden">
-      <div class="actions">
-        <button id="download-zip" type="button" class="primary">Download All Projects (.zip)</button>
-        <button id="download-combined" type="button">Download Combined XLSX</button>
-      </div>
+    <section id="config-view" class="config-shell hidden">
+      <aside class="config-sidebar">
+        <div class="sidebar-block">
+          <h2>Pattern Builder</h2>
+          <p class="config-help">
+            Choose a rule set, then edit patterns in simple rows.
+          </p>
+          <p class="config-note">
+            `contains` matches a phrase, `containsWord` is safer for short codes like TU or RZ, `containsAll` requires every term, `regex` is for advanced cases.
+          </p>
+        </div>
 
-      <table class="summary-table">
-        <thead>
-          <tr>
-            <th>Project</th>
-            <th>Rows</th>
-            <th>Total Hours</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="summary-body"></tbody>
-      </table>
-      <p id="overall-hours" class="overall-hours"></p>
+        <div class="config-kind-switch" role="tablist" aria-label="Rule sets">
+          <button type="button" class="tab active" data-config-kind="project">Projects</button>
+          <button type="button" class="tab" data-config-kind="subproject">Sub Projects</button>
+        </div>
+
+        <label id="config-project-filter-wrap" class="search-field hidden" for="config-project-filter">
+          <span>Project</span>
+          <select id="config-project-filter"></select>
+        </label>
+
+        <label class="search-field" for="config-search">
+          <span>Search groups</span>
+          <input id="config-search" type="search" placeholder="Type a project name">
+        </label>
+
+        <div id="config-list" class="config-list"></div>
+
+        <div class="sidebar-actions sidebar-actions-primary">
+          <button id="add-config-group" type="button" class="primary">Add Group</button>
+        </div>
+
+        <details class="sidebar-more">
+          <summary>...</summary>
+          <div class="sidebar-more-content">
+            <button id="delete-config-group" type="button">Delete Group</button>
+            <button id="reset-config" type="button">Reset Defaults</button>
+            <button id="export-config" type="button">Export Backup</button>
+            <label class="file-label file-label-small" for="import-config">
+              <span>Import Backup</span>
+              <input id="import-config" type="file" accept=".json,application/json">
+            </label>
+          </div>
+        </details>
+
+        <p id="config-status" class="config-status" role="status"></p>
+      </aside>
+
+      <section class="config-main">
+        <div class="config-main-header">
+          <div>
+            <h2 id="config-main-title">Project rules</h2>
+            <p id="config-main-desc" class="config-help">
+              Edit the selected group. Each row is one pattern.
+            </p>
+          </div>
+          <div class="config-header-meta">
+            <p id="config-group-count" class="config-note"></p>
+            <p id="config-save-toast" class="save-toast" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="config-fields">
+          <label class="config-label" for="config-group-name">
+            Group name
+            <input id="config-group-name" type="text">
+          </label>
+          <div id="config-scope-panel" class="scope-panel hidden">
+            <p class="config-label">Applies to projects</p>
+            <div id="config-scope-list" class="scope-list"></div>
+          </div>
+        </div>
+
+        <div class="rule-table-wrap">
+          <table class="rule-table">
+            <thead>
+              <tr>
+                <th>Match type</th>
+                <th>Pattern / Terms</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="matcher-body"></tbody>
+          </table>
+          <button id="add-pattern" type="button" class="primary">Add Pattern</button>
+        </div>
+
+        <section class="config-test">
+          <div class="config-actions">
+            <button id="run-config-test" type="button" class="primary">Preview Selection</button>
+          </div>
+          <p id="config-test-result" class="config-result" role="status"></p>
+          <div id="config-test-preview" class="config-preview"></div>
+        </section>
+      </section>
     </section>
   </main>
 

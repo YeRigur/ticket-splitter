@@ -222,3 +222,4 @@ export const filterDefinitions = filters;
 export const realProjects = filters
   .filter((entry) => entry.name !== 'Incorrect codes')
   .map((entry) => entry.name);
+export { toRegex };
