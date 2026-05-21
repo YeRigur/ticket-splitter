@@ -1686,6 +1686,7 @@ function buildSheetRows(header, records, includeProject, includeSubProject) {
   for (const record of records) {
     const values = record.values.slice();
     values[2] = formatDurationForExport(record.duration, record.values[2]);
+    values[3] = formatDateForExport(record.values[3]);
     const row = [
       ...values,
       ...(includeProject ? [record.project] : []),
@@ -1712,6 +1713,55 @@ function sanitizeSheetName(name) {
   const cleaned = (name || 'Sheet1').replace(/[\[\]\*\/\\\?:]/g, ' ').trim();
   const fallback = cleaned || 'Sheet1';
   return fallback.slice(0, 31);
+}
+
+function formatDateForExport(originalValue) {
+  const cleaned = cleanCell(originalValue);
+  if (!cleaned) {
+    return '';
+  }
+  const parsed = parseDateValue(cleaned);
+  if (!parsed) {
+    return cleaned;
+  }
+  const month = parsed.getMonth() + 1;
+  const day = parsed.getDate();
+  const year = parsed.getFullYear();
+  const hours = parsed.getHours();
+  const minutes = parsed.getMinutes();
+  return `${month}/${day}/${year} ${hours}:${String(minutes).padStart(2, '0')}`;
+}
+
+function parseDateValue(value) {
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (slashMatch) {
+    const month = Number(slashMatch[1]);
+    const day = Number(slashMatch[2]);
+    let year = Number(slashMatch[3]);
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+    const hours = Number(slashMatch[4] ?? 0);
+    const minutes = Number(slashMatch[5] ?? 0);
+    const seconds = Number(slashMatch[6] ?? 0);
+    const date = new Date(year, month - 1, day, hours, minutes, seconds);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const hours = Number(isoMatch[4] ?? 0);
+    const minutes = Number(isoMatch[5] ?? 0);
+    const seconds = Number(isoMatch[6] ?? 0);
+    const date = new Date(year, month - 1, day, hours, minutes, seconds);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function formatDurationForExport(duration, originalValue) {
