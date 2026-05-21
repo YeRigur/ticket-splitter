@@ -1748,6 +1748,21 @@ function parseDateValue(value) {
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
+  const dotMatch = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (dotMatch) {
+    const day = Number(dotMatch[1]);
+    const month = Number(dotMatch[2]);
+    let year = Number(dotMatch[3]);
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+    const hours = Number(dotMatch[4] ?? 0);
+    const minutes = Number(dotMatch[5] ?? 0);
+    const seconds = Number(dotMatch[6] ?? 0);
+    const date = new Date(year, month - 1, day, hours, minutes, seconds);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
   const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (isoMatch) {
     const year = Number(isoMatch[1]);
