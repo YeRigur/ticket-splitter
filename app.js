@@ -1445,6 +1445,16 @@ function showConfigSaveToast(message) {
 }
 
 function classifyProject(comment) {
+  const commentText = String(comment ?? '');
+  if (/\benhancements?\b/i.test(commentText)) {
+    const enhancementDefinition = compiledProjectDefinitions.find(
+      (definition) => /enhancement/i.test(definition.name) && matchesDefinition(definition, commentText)
+    );
+    if (enhancementDefinition) {
+      return enhancementDefinition.name;
+    }
+  }
+
   for (const definition of compiledProjectDefinitions) {
     if (matchesDefinition(definition, comment)) {
       return definition.name;
